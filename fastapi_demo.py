@@ -22,7 +22,7 @@ def predict_using_input(input_data: InputData):
         {"class": "Esperanto", "value": 0.4},
         {"class": "French", "value": 0.1},
         {"class": "Italian", "value": 0.1},
-        {"class": "Spanish", "value": 0.4},
+        {"class": "Spanish", "value": 0.1},
         {"class": "Turkish", "value": 0.1},
         {"class": "English", "value": 0.1},
     ]
