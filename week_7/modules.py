@@ -20,7 +20,7 @@ class DoubleConv(nn.Module):
             nn.GroupNorm(1, mid_channels),
             nn.GELU(),
             nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.GroupNorm(1, mid_channels),
+            nn.GroupNorm(1, out_channels),
         )
 
     def forward(self, x):
@@ -35,7 +35,7 @@ class Down(nn.Module):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels, residual=True),
+            DoubleConv(in_channels, in_channels, residual=True),
             DoubleConv(in_channels, out_channels),
         )
         # Project time embedding to channel space
@@ -46,7 +46,7 @@ class Down(nn.Module):
 
     def forward(self, x, t):
         x = self.maxpool_conv(x)
-        emb = self.emb_layer[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
+        emb = self.emb_layer(t)[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
         return x + emb
 
 
@@ -55,7 +55,7 @@ class Up(nn.Module):
         super().__init__()
         self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         self.conv = nn.Sequential(
-            DoubleConv(in_channels, out_channels, residual=True),
+            DoubleConv(in_channels, in_channels, residual=True),
             DoubleConv(in_channels, out_channels, in_channels // 2),
         )
 
@@ -66,9 +66,9 @@ class Up(nn.Module):
 
     def forward(self, x, skip_x, t):
         x = self.up(x)
-        x = torch.cat([x, skip_x], dim=1)
+        x = torch.cat([skip_x, x], dim=1)
         x = self.conv(x)
-        emb = self.emb_layer[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
+        emb = self.emb_layer(t)[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
         return x + emb
 
 

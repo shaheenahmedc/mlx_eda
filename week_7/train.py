@@ -50,7 +50,7 @@ def train(args):
         )
         torch.save(
             model.state_dict(),
-            os.path.join("models", args.run_name, f"checkpoint_epoch{epoch}.pt"),
+            os.path.join("models", args.run_name, f"checkpoint_epoch_{epoch}.pt"),
         )
 
 
@@ -61,9 +61,9 @@ def launch():
     args = parser.parse_args()
     args.run_name = "DDPM_unconditional"
     args.epochs = 500
-    args.batch_size = 12
+    args.batch_size = 6
     args.image_size = 64
-    args.dataset_path = "PokemonData"
+    args.dataset_path = "pokemon_images"
     args.device = "cuda"
     args.lr = 1e-4
     train(args)

@@ -24,6 +24,7 @@ def plot_images(images):
 def save_images(images, path, **kwargs):
     grid = torchvision.utils.make_grid(images, **kwargs)
     ndarr = grid.permute(1, 2, 0).to("cpu").numpy()
+    ndarr = ndarr.astype("uint8")
     im = Image.fromarray(ndarr)
     im.save(path)
 
@@ -37,6 +38,7 @@ def get_data(args):
             torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
     )
+    print(args.dataset_path)
     dataset = torchvision.datasets.ImageFolder(args.dataset_path, transform=transforms)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
     return dataloader
