@@ -49,14 +49,19 @@ class Diffusion:
     def sample_timesteps(self, n):
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
 
-    def sample(self, model, n):
+    def sample(self, model, n, labels, cfg_scale=3):
         logging.info(f"Sampling {n} new images")
         model.eval()
         with torch.no_grad():
-            x = torch.randn(n, 3, self.img_size, self.img_size).to(self.device)
+            x = torch.randn((n, 3, self.img_size, self.img_size)).to(self.device)
             for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                predicted_noise = model(x, t)
+                predicted_noise = model(x, t, labels)
+                if cfg_scale > 0:
+                    uncond_predicted_noise = model(x, t, None)
+                    predicted_noise = torch.lerp(
+                        uncond_predicted_noise, predicted_noise, cfg_scale
+                    )
                 alpha = self.alpha[t][:, None, None, None]
                 alpha_hat = self.alpha_hat[t][:, None, None, None]
                 beta = self.beta[t][:, None, None, None]
@@ -75,7 +80,8 @@ class Diffusion:
                     )
                     + torch.sqrt(beta) * noise
                 )
-                model.train()
-                x = (x.clamp(-1, 1) + 1) / 2
-                x = x * 255
-                return x
+
+        model.train()
+        x = (x.clamp(-1, 1) + 1) / 2
+        x = (x * 255).type(torch.uint8)
+        return x
