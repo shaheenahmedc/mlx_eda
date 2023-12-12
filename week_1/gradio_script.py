@@ -31,4 +31,4 @@ def predict_language(user_input):
 demo = gr.Interface(fn=predict_language, inputs="text", outputs="text")
 
 if __name__ == "__main__":
-    demo.launch(show_api=False, share = True)
+    demo.launch(show_api=False, share = False, server_name = '0.0.0.0', server_port=8090)
