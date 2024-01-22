@@ -1,5 +1,6 @@
 import torch
 import pandas as pd
+import random
 
 class W2VData(torch.utils.data.Dataset):
     def __init__(self, corpus, window_size=2):
@@ -27,22 +28,74 @@ class W2VData(torch.utils.data.Dataset):
         context, target = self.data[idx]
         return torch.tensor(context), torch.tensor(target)
 
-def two_tower_dataset(dataframe):
+# def two_tower_dataset(dataframe):
+      # Doesn't create negative samples,
+      # as positive and negative labels arise from users
+#     new_rows = []
+#     # Iterate through rows and expand
+#     for index, row in dataframe.iterrows():
+#         print (index/len(dataframe))
+#         query = row['query']
+#         for is_selected, passage in zip(row['passages']['is_selected'], row['passages']['passage_text']):
+#             new_rows.append({
+#                 'query': query,
+#                 'is_selected': 1, # If passage selected by bing, log as 1
+#                 'passage_text': passage
+#             })
+#             # Grab a random document, which Bing didn't return for this query
+#             random_passage =
+#             new_rows.append({
+#                 'query': query,
+#                 'is_selected': 0, # If passage not selected by bing, log as 0
+#                 'passage_text': random_passage
+#             })
+#     # Convert the list of dictionaries to a DataFrame
+#     result_df = pd.DataFrame(new_rows)
+#     return result_df
+
+def two_tower_dataset_optimized(dataframe):
     new_rows = []
+
+    # Create a dictionary mapping queries to lists of passages
+    query_passage_map = {}
+    for index, row in dataframe.iterrows():
+        query = row['query']
+        if query not in query_passage_map:
+            query_passage_map[query] = []
+        query_passage_map[query].extend(row['passages']['passage_text'])
+
+    all_queries = list(query_passage_map.keys())
+
     # Iterate through rows and expand
     for index, row in dataframe.iterrows():
-        print (index/len(dataframe))
+        print(index / len(dataframe))
         query = row['query']
         for is_selected, passage in zip(row['passages']['is_selected'], row['passages']['passage_text']):
+            # Add the passage selected by Bing
             new_rows.append({
                 'query': query,
-                'is_selected': is_selected, # If passage selected by bing, log as 1
+                'is_selected': 1,  # If passage selected by bing, log as 1
                 'passage_text': passage
+            })
+
+            # Grab a random document not returned by Bing for this query
+            while True:
+                random_query = random.choice(all_queries)
+                if random_query != query:
+                    random_passage = random.choice(query_passage_map[random_query])
+                    break
+
+            # Add the randomly selected passage
+            new_rows.append({
+                'query': query,
+                'is_selected': 0,  # If passage not selected by bing, log as 0
+                'passage_text': random_passage
             })
 
     # Convert the list of dictionaries to a DataFrame
     result_df = pd.DataFrame(new_rows)
     return result_df
+
 
 class TwoTowerData(torch.utils.data.Dataset):
     def __init__(self, dataframe):
