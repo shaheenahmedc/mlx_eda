@@ -24,7 +24,9 @@ def create_offline_sentence_embeddings(sentences, model, tokenizer):
             # Using dummy tensor for query since we only want the sentence embedding
             _, sentence_embedding = model(sentence_tensor, sentence_tensor)
             # Compute cosine similarity
-            embeddings_dict[sentence] = sentence_embedding
+            # For JSON storage, need to convert embedding to list
+            embeddings_dict[sentence] = sentence_embedding.tolist()
+
     return embeddings_dict
 
 def compute_similarities(query_embedding, offline_sentence_embeddings_dict, model, tokenizer):
@@ -38,6 +40,7 @@ def compute_similarities(query_embedding, offline_sentence_embeddings_dict, mode
             # Using dummy tensor for query since we only want the sentence embedding
 #             _, sentence_embedding = model(sentence_tensor, sentence_tensor)
             # Compute cosine similarity
-            cosine_similarity = F.cosine_similarity(query_embedding, sentence_embedding)
+            # Convert embedding from list in Json, to tensor
+            cosine_similarity = F.cosine_similarity(query_embedding, torch.Tensor(sentence_embedding))
             similarities_dict[sentence] = cosine_similarity.item()
     return similarities_dict

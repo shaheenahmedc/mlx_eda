@@ -22,16 +22,11 @@ def train_two_tower(n_epochs, model, loss_function, optimizer, dataloader):
         # Wrap your data loader with tqdm for a nice progress bar
         progress_bar = tqdm.tqdm(dataloader, desc=f'Epoch {epoch+1}/{n_epochs}', unit='batch')
 
-        i = 0
-        for i, (batch_query, label, batch_sentence) in enumerate(progress_bar, start=1):
-            i += 1
-            if (i > batch_lim):
-                break
-            else:
-                optimizer.zero_grad()
+        for batch_query, label, batch_sentence in enumerate(progress_bar, start=1):
+            optimizer.zero_grad()
 
-                query_vector, sentence_vector = model(batch_query, batch_sentence)
-                loss = loss_function(query_vector, sentence_vector, label)
+            query_vector, sentence_vector = model(batch_query, batch_sentence)
+            loss = loss_function(query_vector, sentence_vector, label)
 
-                loss.backward()
-                optimizer.step()
+            loss.backward()
+            optimizer.step()
