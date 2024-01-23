@@ -4,11 +4,12 @@ from inference import get_query_embedding, compute_similarities
 from model import CBOW, TwoTowerModel
 from config import Config
 import sentencepiece as spm
-
+import json
 def return_top_n_docs(user_input):
 
     # Load offline document embeddings
-    offline_embeddings_dict = torch.load(f'offline_embeddings_dict.json')
+    with open('offline_embeddings_dict.json', 'r') as file:
+        offline_embeddings_dict = json.load(file)
 
     # Load model
     cbow = CBOW(Config.SP_VOCAB_SIZE, Config.W2V_EMBEDDING_DIM)
@@ -18,7 +19,7 @@ def return_top_n_docs(user_input):
         embedding_matrix=torch.tensor(embedding_weights),
         hidden_size=Config.TWO_TOWER_HIDDEN_DIM,
         output_size=Config.TWO_TOWER_OUTPUT_DIM)
-    model.load_state_dict(torch.load("path_to_two_tower_weights"), strict=False)
+    model.load_state_dict(torch.load("two_tower.pth"), strict=False)
     model.eval()
 
     # Load the trained SentencePiece model
