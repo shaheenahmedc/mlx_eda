@@ -1,43 +1,43 @@
 import gradio as gr
 import torch
 from inference import get_query_embedding, compute_similarities
-
+from model import CBOW, TwoTowerModel
+from config import Config
+import sentencepiece as spm
 
 def return_top_n_docs(user_input):
 
     # Load offline document embeddings
-    state_dict_classification = torch.load(f'offline_embeddings_dict.json')
+    offline_embeddings_dict = torch.load(f'offline_embeddings_dict.json')
+
     # Load model
-    # How to store experiment variables like vocab_size?
-    vocab_size = 1000
-    cbow = CBOW(vocab_size, embedding_dim)
+    cbow = CBOW(Config.SP_VOCAB_SIZE, Config.W2V_EMBEDDING_DIM)
     cbow.load_state_dict(torch.load(f'cbow_final_epoch.pt'))
     embedding_weights = cbow.embeddings.weight.data.detach()
-    model = TwoTowerModel(embedding_matrix=torch.tensor(embedding_weights), hidden_size=128, output_size=64)
+    model = TwoTowerModel(
+        embedding_matrix=torch.tensor(embedding_weights),
+        hidden_size=Config.TWO_TOWER_HIDDEN_DIM,
+        output_size=Config.TWO_TOWER_OUTPUT_DIM)
     model.load_state_dict(torch.load("path_to_two_tower_weights"), strict=False)
     model.eval()
+
+    # Load the trained SentencePiece model
+    tokenizer = spm.SentencePieceProcessor()
+    tokenizer.Load('mymodel.model')
+
     # Get user query embedding
-    tokenizer = get_query_embedding(query, model, tokenizer)
-    # Use tokenizer vocab size to initialise language classification model
-    classification_model = Language(torch.rand(len(tokenizer.vocab), 50), 7)
-    # Load pre-trained weights into classification model
-    classification_model.load_state_dict(state_dict_classification)
-    # Set language ordering
-    langs = ["German", "Esperanto", "French", "Italian", "Spanish", "Turkish", "English"]
-    classification_model.eval()
+    query_embedding = get_query_embedding(user_input, model, tokenizer)
 
+    # Compute similarities
+    similarities = compute_similarities(query_embedding, offline_embeddings_dict, model, tokenizer)
 
-    text = user_input
-    tokens = tokenizer.encode(text)
-    tokens = torch.tensor(tokens, dtype=torch.long).unsqueeze(0)
-    predictions = classification_model(tokens)
-    predictions_softmaxed = torch.nn.functional.softmax(predictions, dim=1)
-    predictions_softmaxed = predictions_softmaxed.squeeze(0).tolist()
+    # Get top 10 matches (adjust as needed)
+    sorted_indices = sorted(similarities.items(), key=lambda item: item[1], reverse=True)
+    top_matches = sorted_indices[:10]
 
-    result = [{"class": class_name, "value": value} for class_name, value in zip(langs, predictions_softmaxed)]
-    return result
+    return top_matches
 
-demo = gr.Interface(fn=predict_language, inputs="text", outputs="text")
+demo = gr.Interface(fn=return_top_n_docs, inputs="text", outputs="text")
 
 if __name__ == "__main__":
-    demo.launch(show_api=False, share = False, server_name = '0.0.0.0', server_port=8090)
+    demo.launch(show_api=False, share = False, server_name = '0.0.0.0', server_port=8091)
