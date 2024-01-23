@@ -40,4 +40,4 @@ def return_top_n_docs(user_input):
 demo = gr.Interface(fn=return_top_n_docs, inputs="text", outputs="text")
 
 if __name__ == "__main__":
-    demo.launch(show_api=False, share = False, server_name = '0.0.0.0', server_port=8091)
+    demo.launch(show_api=False, share = True, server_name = '0.0.0.0', server_port=8091)
