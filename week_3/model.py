@@ -20,11 +20,13 @@ from torch.utils.data import DataLoader
 import wandb
 from pathlib import Path
 import webbrowser
+from dataclasses import dataclass
 
 
+@dataclass
 class Config:
     d_model: int = 768
-    #     debug: bool = True
+#     debug: bool = True
     layer_norm_eps: float = 1e-5
     d_vocab: int = 50257
     init_range: float = 0.02
@@ -33,23 +35,15 @@ class Config:
     d_mlp: int = 3072
     n_heads: int = 12
     n_layers: int = 12
-
-
-
-
-device = t.device("cuda" if t.cuda.is_available() else "cpu")
-
+    device: str = t.device("cuda" if t.cuda.is_available() else "cpu")
 
 class Embed(nn.Module):
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg:Config):
         super().__init__()
         self.cfg = cfg
         self.W_E = nn.Parameter(t.empty(cfg.d_vocab, cfg.d_model))
-        nn.init.normal_(self.W_E, std=self.cfg.init_range)
-
-    def forward(
-        self, tokens: Int[Tensor, "batch position"]
-    ) -> Float[Tensor, "batch position d_model"]:
+        nn.init.normal_(self.W_E, std = self.cfg.init_range)
+    def forward(self, tokens: Int[Tensor, "batch position"]) -> Float[Tensor, "batch position d_model"]:
         return self.W_E[tokens]
 
 
@@ -72,7 +66,7 @@ class PosEmbed(nn.Module):
 class Attention(nn.Module):
     IGNORE: Float[Tensor, ""]
 
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg:Config):
         super().__init__()
         self.cfg = cfg
         self.W_Q = nn.Parameter(t.empty(cfg.n_heads, cfg.d_model, cfg.d_head))
@@ -87,77 +81,56 @@ class Attention(nn.Module):
         nn.init.normal_(self.W_K, std=self.cfg.init_range)
         nn.init.normal_(self.W_V, std=self.cfg.init_range)
         nn.init.normal_(self.W_O, std=self.cfg.init_range)
-        self.register_buffer("IGNORE", t.tensor(-1e5, dtype=t.float32, device=device))
+        self.register_buffer("IGNORE", t.tensor(-1e5, dtype=t.float32, device=cfg.device))
 
     def forward(
         self, normalized_resid_pre: Float[Tensor, "batch seq_len d_model"]
     ) -> Float[Tensor, "batch seq_len d_model"]:
-        Keys = (
-            einops.einsum(
-                normalized_resid_pre,
-                self.W_K,
-                "batch seq_len d_model, n_heads d_model d_head -> batch seq_len n_heads d_head",
-            )
-            + self.b_K
-        )
-
-        Queries = (
-            einops.einsum(
-                normalized_resid_pre,
-                self.W_Q,
-                "batch seq_len d_model, n_heads d_model d_head -> batch seq_len n_heads d_head",
-            )
-            + self.b_Q
-        )
-        Values = (
-            einops.einsum(
-                normalized_resid_pre,
-                self.W_V,
-                "batch seq_len d_model, n_heads d_model d_head -> batch seq_len n_heads d_head",
-            )
-            + self.b_V
-        )
+        Keys = einops.einsum(
+            normalized_resid_pre,
+            self.W_K,
+            "batch seq_len d_model, n_heads d_model d_head -> batch seq_len n_heads d_head"
+            ) + self.b_K
+        Queries = einops.einsum(
+            normalized_resid_pre,
+            self.W_Q,
+            "batch seq_len d_model, n_heads d_model d_head -> batch seq_len n_heads d_head"
+            ) + self.b_Q
+        Values = einops.einsum(
+            normalized_resid_pre,
+            self.W_V,
+            "batch seq_len d_model, n_heads d_model d_head -> batch seq_len n_heads d_head"
+            ) + self.b_V
         Attention_Scores = einops.einsum(
             Queries,
             Keys,
-            "batch seq_len_Q n_heads d_head, batch seq_len_K n_heads d_head -> batch n_heads seq_len_Q seq_len_K",
-        )
-        Attention_Scores_Masked_Scaled = self.apply_causal_mask(
-            Attention_Scores / self.cfg.d_head**0.5
-        )
-        Attention_Scores_Masked_Scaled_Softmaxed = (
-            Attention_Scores_Masked_Scaled.softmax(-1)
-        )
+            "batch seq_len_Q n_heads d_head, batch seq_len_K n_heads d_head -> batch n_heads seq_len_Q seq_len_K")
+        Attention_Scores_Masked_Scaled = self.apply_causal_mask(Attention_Scores / self.cfg.d_head**0.5)
+        Attention_Scores_Masked_Scaled_Softmaxed = Attention_Scores_Masked_Scaled.softmax(-1)
 
-        #         Z = einops.einsum(Attention_Scores_Masked_Scaled_Softmaxed, self.W_V, "batch seq_len_Q seq_len_K , batch seq_len_K n_heads d_head -> batch seq_len_Q n_heads d_head")
+#         Z = einops.einsum(Attention_Scores_Masked_Scaled_Softmaxed, self.W_V, "batch seq_len_Q seq_len_K , batch seq_len_K n_heads d_head -> batch seq_len_Q n_heads d_head")
         Z = einops.einsum(
             Values,
             Attention_Scores_Masked_Scaled_Softmaxed,
-            "batch seq_len_K n_heads d_head, batch n_heads seq_len_Q seq_len_K -> batch seq_len_Q n_heads d_head",
-        )
+            "batch seq_len_K n_heads d_head, batch n_heads seq_len_Q seq_len_K -> batch seq_len_Q n_heads d_head")
 
-        Attention_Out = (
-            einops.einsum(
-                Z,
-                self.W_O,
-                "batch seq_len_Q n_heads d_head, n_heads d_head d_model -> batch seq_len_Q d_model",
-            )
-            + self.b_O
-        )
+        Attention_Out = einops.einsum(
+            Z,
+            self.W_O,
+            "batch seq_len_Q n_heads d_head, n_heads d_head d_model -> batch seq_len_Q d_model"
+            ) + self.b_O
 
         return Attention_Out
 
     def apply_causal_mask(
         self, attn_scores: Float[Tensor, "batch n_heads query_pos key_pos"]
     ) -> Float[Tensor, "batch n_heads query_pos key_pos"]:
-        """
+        '''
         Applies a causal mask to attention scores, and returns masked scores.
-        """
-        key_by_query_ones = t.ones(
-            attn_scores.size(-2), attn_scores.size(-1), device=attn_scores.device
-        )
-        mask = t.triu(key_by_query_ones, diagonal=1).bool()
-        attn_scores.masked_fill(mask, self.IGNORE)
+        '''
+        key_by_query_ones = t.ones(attn_scores.size(-2), attn_scores.size(-1), device = attn_scores.device)
+        mask = t.triu(key_by_query_ones, diagonal = 1).bool()
+        attn_scores.masked_fill_(mask, self.IGNORE)
         return attn_scores
 
 
@@ -169,31 +142,24 @@ class MLP(nn.Module):
         self.W_out = nn.Parameter(t.empty(cfg.d_mlp, cfg.d_model))
         self.b_in = nn.Parameter(t.zeros(cfg.d_mlp))
         self.b_out = nn.Parameter(t.zeros(cfg.d_model))
-        nn.init.normal_(self.W_in, std=self.cfg.init_range)
-        nn.init.normal_(self.W_out, std=self.cfg.init_range)
+        nn.init.normal_(self.W_in, std = self.cfg.init_range)
+        nn.init.normal_(self.W_out, std = self.cfg.init_range)
 
     def forward(
         self, normalized_resid_mid: Float[Tensor, "batch seq_len d_model"]
     ) -> Float[Tensor, "batch seq_len d_model"]:
-        post_W_in = (
-            einops.einsum(
-                normalized_resid_mid,
-                self.W_in,
-                "batch seq_len d_model, d_model d_mlp -> batch seq_len d_mlp",
-            )
-            + self.b_in
-        )
+
+        post_W_in = einops.einsum(
+            normalized_resid_mid,
+            self.W_in,
+            "batch seq_len d_model, d_model d_mlp -> batch seq_len d_mlp") + self.b_in
 
         post_activation = gelu_new(post_W_in)
 
-        post_W_out = (
-            einops.einsum(
-                post_activation,
-                self.W_out,
-                "batch seq_len d_mlp, d_mlp d_model -> batch seq_len d_model",
-            )
-            + self.b_out
-        )
+        post_W_out = einops.einsum(
+            post_activation,
+            self.W_out,
+            "batch seq_len d_mlp, d_mlp d_model -> batch seq_len d_model") + self.b_out
         return post_W_out
 
 
@@ -204,16 +170,13 @@ class LayerNorm(nn.Module):
         self.w = nn.Parameter(t.ones(cfg.d_model))
         self.b = nn.Parameter(t.zeros(cfg.d_model))
 
-    def forward(
-        self, residual: Float[Tensor, "batch posn d_model"]
-    ) -> Float[Tensor, "batch posn d_model"]:
+    def forward(self, residual: Float[Tensor, "batch posn d_model"]) -> Float[Tensor, "batch posn d_model"]:
         residual_mean = residual.mean(dim=-1, keepdim=True)
-        residual_std = (
-            residual.var(dim=-1, keepdim=True, unbiased=False) + self.cfg.layer_norm_eps
-        ).sqrt()
+        residual_std = (residual.var(dim=-1, keepdim=True, unbiased=False) + self.cfg.layer_norm_eps).sqrt()
 
         residual = (residual - residual_mean) / residual_std
         return residual * self.w + self.b
+
 
 
 class TransformerBlock(nn.Module):
@@ -233,25 +196,23 @@ class TransformerBlock(nn.Module):
         return resid_post
 
 
+
 class Unembed(nn.Module):
     def __init__(self, cfg: Config):
         super().__init__()
         self.cfg = cfg
         self.W_U = nn.Parameter(t.empty(cfg.d_model, cfg.d_vocab))
-        self.b_U = nn.Parameter(t.zeros(cfg.d_vocab), requires_grad=False)
-        nn.init.normal_(self.W_U, std=self.cfg.init_range)
+        self.b_U = nn.Parameter(t.zeros(cfg.d_vocab), requires_grad = False)
+        nn.init.normal_(self.W_U, std = self.cfg.init_range)
 
     def forward(
         self, resid_stream: Float[Tensor, "batch seq_len d_model"]
     ) -> Float[Tensor, "batch seq_len d_vocab"]:
-        Unembedding = (
-            einops.einsum(
-                resid_stream,
-                self.W_U,
-                "batch seq_len d_model, d_model d_vocab -> batch seq_len d_vocab",
-            )
-            + self.b_U
-        )
+
+        Unembedding = einops.einsum(
+            resid_stream,
+            self.W_U,
+            "batch seq_len d_model, d_model d_vocab -> batch seq_len d_vocab") + self.b_U
         return Unembedding
 
 
@@ -261,15 +222,13 @@ class DemoTransformer(nn.Module):
         self.cfg = cfg
         self.embed = Embed(cfg)
         self.pos_embed = PosEmbed(cfg)
-        self.blocks = nn.ModuleList(
-            [TransformerBlock(cfg) for _ in range(cfg.n_layers)]
-        )
+        self.blocks = nn.ModuleList([TransformerBlock(cfg) for _ in range(cfg.n_layers)])
         self.ln_final = LayerNorm(cfg)
         self.unembed = Unembed(cfg)
 
-    def forward(
-        self, tokens: Float[Tensor, "batch seq_len"]
-    ) -> Float[Tensor, "batch seq_len d_vocab"]:
+    def forward(self, tokens: Int[Tensor, "batch seq_len"]
+               ) -> Float[Tensor, "batch seq_len d_vocab"]:
+
         residual = self.embed(tokens) + self.pos_embed(tokens)
         for block in self.blocks:
             residual = block(residual)
@@ -277,11 +236,18 @@ class DemoTransformer(nn.Module):
         return logits
 
 
+
+
+
+
+
+
 class TransformerSampler:
-    def __init__(self, model: DemoTransformer, tokenizer: GPT2TokenizerFast):
+    def __init__(self, model: DemoTransformer, tokenizer: GPT2TokenizerFast, model_cfg: Config):
         self.model = model
         self.cfg = model.cfg
         self.tokenizer = tokenizer
+        self.model_cfg = model_cfg
 
     @t.inference_mode()
     def sample(self, prompt: str, max_tokens_generated=1000, verbose=False, **kwargs):
@@ -296,7 +262,7 @@ class TransformerSampler:
         """
         # SOLUTION
         self.model.eval()
-        input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(device)[0]
+        input_ids = self.tokenizer.encode(prompt, return_tensors="pt").to(self.model_cfg.device)[0]
 
         for i in range(max_tokens_generated):
             # Get new logits (make sure we don't pass in more tokens than the model's context length)
@@ -306,7 +272,7 @@ class TransformerSampler:
             # Get next token (as a tensor of size (1, 1) so we can concat it to input_ids)
             next_token = t.tensor(
                 [TransformerSampler.sample_next_token(input_ids, logits, **kwargs)],
-                device=device,
+                device= self.model_cfg.device,
             )
             # Create new input ids string, with shape (1, old_seq_len + 1)
             input_ids = t.cat([input_ids, next_token], dim=-1)
