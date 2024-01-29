@@ -18,7 +18,7 @@ def return_transformer_output(user_input):
         n_ctx=256,
         d_vocab= 50257)
     sampling_model = DemoTransformer(model_cfg).to(model_cfg.device)
-    sampling_model.load_state_dict(torch.load("gpt2_styl e_model_weights.pth"))
+    sampling_model.load_state_dict(torch.load("gpt2_style_model_weights.pth"))
 
     sampler = TransformerSampler(sampling_model, tokenizer, model_cfg)
 
@@ -32,4 +32,4 @@ def return_transformer_output(user_input):
 demo = gr.Interface(fn=return_transformer_output, inputs="text", outputs="text")
 
 if __name__ == "__main__":
-    demo.launch(show_api=False, share = True, server_name = '0.0.0.0', server_port=8091)
+    demo.launch(show_api=False, share = True, server_name = '0.0.0.0', server_port=8092)
