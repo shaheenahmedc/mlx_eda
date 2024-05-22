@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "week-1"
+version = "0.1.0"
+description = ""
+authors = ["Shaheen Ahmed-Chowdhury <shaheen.ahmed@live.co.uk>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.111.0"
+pydantic = "^2.7.1"
+json2json = "^0.1.0"
+gradio = "^4.31.5"
+pandas = "^2.2.2"
+tqdm = "^4.66.4"
+torch = [
+    { version = "^2.2.0", source = "pypi", markers = "sys_platform == 'darwin'" },
+    { version = "^2.2.0", source = "pypi", markers = "platform_machine == 'aarch64' and sys_platform != 'darwin'" },
+    { version = "^2.2.0", source = "pytorch_cpu", markers = "platform_machine == 'x86_64' and sys_platform != 'darwin'" },
+]
+torchvision = [
+    { version = "^0.17.0", source = "pypi", markers = "sys_platform == 'darwin'" },
+    { version = "^0.17.0", source = "pypi", markers = "platform_machine == 'aarch64' and sys_platform != 'darwin'" },
+    { version = "^0.17.0", source = "pytorch_cpu", markers = "platform_machine == 'x86_64' and sys_platform != 'darwin'" },
+]
+pyarrow = "^16.1.0"
+fastparquet = "^2024.5.0"
+
+[[tool.poetry.source]]
+name = "pytorch_cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
