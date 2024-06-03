@@ -8,7 +8,7 @@ from torch import Tensor
 import torch.nn as nn
 import numpy as np
 import math
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from typing import Tuple, List, Optional, Dict
 from jaxtyping import Float, Int
 from transformers.models.gpt2.tokenization_gpt2_fast import GPT2TokenizerFast
@@ -23,14 +23,16 @@ import webbrowser
 from dataclasses import dataclass
 from model import DemoTransformer, Config
 
+device = t.device("cuda" if t.cuda.is_available() else "cpu")
+
 @dataclass
 class TransformerTrainingArgs():
     batch_size = 16
     epochs = 5
-    max_steps_per_epoch = 10
+    # max_steps_per_epoch = 10
     lr = 1e-3
     weight_decay = 1e-2
-    wandb_project: Optional[str] = "day2-demotransformer"
+    wandb_project: Optional[str] = "demo_gpt2"
     wandb_name: Optional[str] = 'shaheen-ahmed'
 
 
@@ -59,7 +61,7 @@ class TransformerTrainer:
         # Zero out gradients
         self.optimizer.zero_grad()
         self.step += 1
-        # wandb.log({"train_loss": loss}, step=self.step)
+        wandb.log({"train_loss": loss}, step=self.step)
         return loss
 
     def validation_step(self, batch: Dict[str, Int[Tensor, "batch seq"]]):
@@ -70,32 +72,34 @@ class TransformerTrainer:
         return correct_predictions
 
     def train(self):
+        num_batches = len(self.dataset_dict['train']) // self.args.batch_size
+
+        print(f"Length of train_loader: {len(self.dataset_dict['train']) // self.args.batch_size}")
+
         print ('wandb init below')
 
-        # wandb.init(project=self.args.wandb_project, name=self.args.wandb_name, config=self.args)
+        wandb.init(project=self.args.wandb_project, name=self.args.wandb_name, config=self.args)
         print ('wandb init done')
 
         accuracy = np.nan
 
-        progress_bar = tqdm(total = self.args.max_steps_per_epoch * self.args.epochs)
-        print ('progress bar made')
         for epoch in range(self.args.epochs):
+            progress_bar = tqdm(total=num_batches, desc=f"Epoch {epoch+1}", leave=True)
             for i, batch in enumerate(self.train_loader()):
                 loss = self.training_step(batch)
                 progress_bar.update()
                 progress_bar.set_description(f"Epoch {epoch+1}, loss: {loss:.3f}, accuracy: {accuracy:.2f}")
-                if i >= self.args.max_steps_per_epoch:
-                    break
+                # if i >= self.args.max_steps_per_epoch:
+                #     break
 
             correct_predictions = t.concat([self.validation_step(batch) for batch in self.test_loader()])
             accuracy = correct_predictions.float().mean().item()
-            # wandb.log({"accuracy": accuracy}, step=self.step)
+            wandb.log({"accuracy": accuracy}, step=self.step)
 
-        # wandb.finish()
+        wandb.finish()
 
     def train_loader(self) -> DataLoader:
         return DataLoader(self.dataset_dict["train"], batch_size=self.args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
 
     def test_loader(self) -> DataLoader:
         return DataLoader(self.dataset_dict["test"], batch_size=self.args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
-

@@ -8,7 +8,7 @@ from torch import Tensor
 import torch.nn as nn
 import numpy as np
 import math
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from typing import Tuple, List, Optional, Dict
 from jaxtyping import Float, Int
 from transformers.models.gpt2.tokenization_gpt2_fast import GPT2TokenizerFast
