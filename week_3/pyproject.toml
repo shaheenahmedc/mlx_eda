@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "week-3"
+version = "0.1.0"
+description = ""
+authors = ["Shaheen Ahmed-Chowdhury <shaheen.ahmed@live.co.uk>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.111.0"
+pydantic = "^2.7.2"
+einops = "^0.8.0"
+transformer-lens = "^2.0.0"
+numpy = "^1.26.4"
+tqdm = "^4.66.4"
+jaxtyping = "^0.2.29"
+wandb = "^0.17.0"
+gradio = "^4.32.1"
+ipywidgets = "^8.1.3"
+jupyter = "^1.0.0"
+nbconvert = "^7.16.4"
+nbstripout = "^0.7.1"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
